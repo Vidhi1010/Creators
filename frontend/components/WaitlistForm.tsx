@@ -94,13 +94,36 @@ const SayHiveWaitlist: React.FC = () => {
     setToast(null);
   };
 
+  const checkEmailExists = async (email: string): Promise<boolean> => {
+    try {
+      const q = query(
+        collection(db, "waitlist"), 
+        where("email", "==", email.toLowerCase().trim())
+      );
+      const querySnapshot = await getDocs(q);
+      return !querySnapshot.empty;
+    } catch (error) {
+      console.error("Error checking email existence:", error);
+      throw error;
+    }
+  };
+
   const handleSubmit = async () => {
     if (!name.trim() || !email.trim()) return;
     
     setIsLoading(true);
     
     try {
-      // Step 1: Validate Email with Abstract API
+      // Step 1: Check if email already exists in waitlist
+      const emailExists = await checkEmailExists(email);
+      
+      if (emailExists) {
+        showToast("This email is already registered! Please use another email address.", "warning");
+        setIsLoading(false);
+        return;
+      }
+
+      // Step 2: Validate Email with Abstract API
       const response = await fetch(
         `https://emailvalidation.abstractapi.com/v1/?api_key=54bd358a7e4b4226a94fa0af0dcf9cdf&email=${email}`
       );
@@ -117,14 +140,14 @@ const SayHiveWaitlist: React.FC = () => {
         return;
       }
 
-      // Step 2: Save to Firebase Firestore
+      // Step 3: Save to Firebase Firestore
       await addDoc(collection(db, "waitlist"), {
-        name,
-        email,
+        name: name.trim(),
+        email: email.toLowerCase().trim(),
         createdAt: serverTimestamp()
       });
 
-      // Step 3: UI Update
+      // Step 4: UI Update
       setIsSubmitted(true);
       showToast("Welcome to the hive! You're now on our waitlist.", "success");
       setIsLoading(false);
